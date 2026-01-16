@@ -123,6 +123,7 @@
 
 <script>
 let lastAngle = null;
+let initialOffset = null;
 let wakeLock = null;
 let speakInterval = null;
 
@@ -160,7 +161,7 @@ function speak(text) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "es-ES";
   utter.rate = 1;
-  utter.volume = 0.7; // 🔊 volumen más bajo para la voz
+  utter.volume = 0.7;
   window.speechSynthesis.speak(utter);
 }
 
@@ -171,10 +172,10 @@ function startAudio() {
   
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
-  mainTone.frequency.value = 150; // inicial grave
+  mainTone.frequency.value = 150;
 
   gainNode = audioCtx.createGain();
-  gainNode.gain.value = 0.4; // 🔊 sonido más fuerte
+  gainNode.gain.value = 0.4;
 
   mainTone.connect(gainNode);
   gainNode.connect(audioCtx.destination);
@@ -233,22 +234,24 @@ function speakCurrentDirection(angle) {
 function handleOrientation(event) {
   let angle = event.alpha;
   if (angle === null) return;
-  angle = (angle + 180) % 360;
+
+  // Ajuste inicial para que la brújula apunte al Norte
+  if (initialOffset === null) {
+    initialOffset = (360 - angle) % 360;
+  }
+
+  angle = (angle + initialOffset) % 360;
   angle = Math.round(angle);
 
   const container = document.getElementById("cardinalsContainer");
   container.style.transform = `rotate(${-angle}deg)`;
 
-  const needle = document.getElementById("needle");
-
-  // Actualiza frecuencia continua según ángulo
   if (mainTone) {
     mainTone.frequency.setTargetAtTime(angleToFrequency(angle), audioCtx.currentTime, 0.05);
   }
 
   lastAngle = angle;
 
-  // Actualiza texto visual
   let closest = CARDINALS[0];
   let minDiff = 360;
   CARDINALS.forEach(c => {
@@ -298,7 +301,6 @@ document.getElementById("startBtn").addEventListener("click", async () => {
 
   window.addEventListener("deviceorientation", handleOrientation);
 
-  // 🔊 Intervalo de voz cada 3 segundos
   if (!speakInterval) {
     speakInterval = setInterval(() => {
       if (lastAngle !== null) speakCurrentDirection(lastAngle);
