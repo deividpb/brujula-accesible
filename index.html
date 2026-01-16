@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Brújula Accesible</title>
+<title>Brújula Accesible Sonido Direccional</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body { font-family:sans-serif; text-align:center; background:#f0f0f0; }
@@ -57,9 +57,9 @@ let speakInterval = null;
 
 // --- AUDIO ---
 let audioCtx = null;
-let mainTone = null;
-let modulator = null;
-let modGain = null;
+let mainTone = null;      // sonido bajo de referencia
+let directionTone = null; // sonido "PIIII" o "POOO"
+let dirGain = null;
 
 // --- CONFIGURACIÓN ---
 const STABLE_THRESHOLD = 2; 
@@ -86,46 +86,48 @@ function speak(text) {
 
 // --- AUDIO ---
 function startAudio() {
-  if (audioCtx) return;
+  if(audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+  // Sonido bajo de referencia
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
-  mainTone.frequency.value = 150; // bajo constante
-  const gain = audioCtx.createGain();
-  gain.gain.value = 0.02;
-  mainTone.connect(gain);
-  gain.connect(audioCtx.destination);
+  mainTone.frequency.value = 150;
+  const mainGain = audioCtx.createGain();
+  mainGain.gain.value = 0.02;
+  mainTone.connect(mainGain);
+  mainGain.connect(audioCtx.destination);
   mainTone.start();
 
-  modulator = audioCtx.createOscillator();
-  modulator.type = "sine";
-  modulator.frequency.value = 0;
-  modGain = audioCtx.createGain();
-  modGain.gain.value = 0;
-  modulator.connect(modGain);
-  modGain.connect(audioCtx.destination);
-  modulator.start();
+  // Sonido direccional
+  directionTone = audioCtx.createOscillator();
+  directionTone.type = "sine";
+  directionTone.frequency.value = 0;
+  dirGain = audioCtx.createGain();
+  dirGain.gain.value = 0;
+  directionTone.connect(dirGain);
+  dirGain.connect(audioCtx.destination);
+  directionTone.start();
 }
 
+// --- AUDIO SEGÚN MOVIMIENTO ---
 function updateAudio(angle, diff) {
-  if (!mainTone) return;
-  if (diff <= STABLE_THRESHOLD) {
+  if(!mainTone) return;
+
+  if(diff <= STABLE_THRESHOLD){
     // estable → sonido bajo
     mainTone.frequency.value = 150;
-    modGain.gain.value = 0;
-    modulator.frequency.value = 0;
-  } else {
-    if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
-      // derecha → pitido intermitente
-      mainTone.frequency.value = 400;
-      modulator.frequency.value = 2;
-      modGain.gain.value = 0.02;
-    } else {
-      // izquierda → pitido constante
-      mainTone.frequency.value = 400;
-      modulator.frequency.value = 0;
-      modGain.gain.value = 0;
+    dirGain.gain.value = 0;
+    directionTone.frequency.value = 0;
+  }else{
+    if((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)){
+      // derecha → "POOO" continuo grave
+      directionTone.frequency.value = 250; // grave
+      dirGain.gain.value = 0.05;          // audible
+    }else{
+      // izquierda → "PIIII" continuo agudo
+      directionTone.frequency.value = 800; // agudo
+      dirGain.gain.value = 0.05;
     }
   }
 }
@@ -151,30 +153,30 @@ function drawCardinals() {
 // --- ORIENTACIÓN ---
 function handleOrientation(event) {
   let angle = event.alpha;
-  if (angle===null) return;
-  angle = (angle + 180)%360;
+  if(angle===null) return;
+  angle = (angle+180)%360;
   angle = Math.round(angle);
 
   // --- ROTAR EL CONTENEDOR DE CARDINALES ---
   const container = document.getElementById("cardinalsContainer");
-  container.style.transform = `rotate(${-angle}deg)`; // negativo para que gire en sentido correcto
+  container.style.transform = `rotate(${-angle}deg)`;
 
   // --- AUDIO ---
-  if (lastAngle !== null) {
-    const diff = Math.abs(angle - lastAngle);
+  if(lastAngle!==null){
+    const diff = Math.abs(angle-lastAngle);
     updateAudio(angle,diff);
   }
 
   // --- PUNTOS CARDINALES ---
-  CARDINALS.forEach(c => {
-    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
-    if (diff < 10) { 
-      if (!currentCardinal || currentCardinal.name !== c.name) {
+  CARDINALS.forEach(c=>{
+    const diff = Math.min(Math.abs(angle-c.angle), 360-Math.abs(angle-c.angle));
+    if(diff<10){ 
+      if(!currentCardinal || currentCardinal.name!==c.name){
         currentCardinal = c;
         speak(c.name);
-        if (speakInterval) clearInterval(speakInterval);
+        if(speakInterval) clearInterval(speakInterval);
         speakInterval = setInterval(()=> speak(c.name), CARDINAL_REPEAT_INTERVAL);
-        document.getElementById("directionText").textContent = c.name;
+        document.getElementById("directionText").textContent=c.name;
       }
     }
   });
@@ -183,15 +185,15 @@ function handleOrientation(event) {
 }
 
 // --- INICIO ---
-document.getElementById("startBtn").addEventListener("click", async () => {
+document.getElementById("startBtn").addEventListener("click", async ()=>{
   document.getElementById("startBtn").style.display="none";
   document.getElementById("compass").style.display="block";
   drawCardinals();
   startAudio();
 
-  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+  if(typeof DeviceOrientationEvent.requestPermission==="function"){
     const permission = await DeviceOrientationEvent.requestPermission();
-    if (permission!=="granted") { speak("Permiso denegado"); return; }
+    if(permission!=="granted"){ speak("Permiso denegado"); return; }
   }
   speak("Brújula iniciada");
   window.addEventListener("deviceorientation", handleOrientation);
