@@ -43,7 +43,7 @@
 </head>
 <body>
 
-<button id="startBtn">Tocar para comenzar 8.1</button>
+<button id="startBtn">Tocar para comenzar 9</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
   <div id="cardinalsContainer"></div>
@@ -53,6 +53,7 @@
 <script>
 let lastAngle = null;
 let speakInterval = null;
+let wakeLock = null;
 
 // --- AUDIO ---
 let audioCtx = null;
@@ -90,7 +91,7 @@ function startAudio() {
 
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
-  mainTone.frequency.value = 150; // bajo constante
+  mainTone.frequency.value = 150; 
   const gain = audioCtx.createGain();
   gain.gain.value = 0.02;
   mainTone.connect(gain);
@@ -110,18 +111,15 @@ function startAudio() {
 function updateAudio(angle, diff) {
   if (!mainTone) return;
   if (diff <= STABLE_THRESHOLD) {
-    // estable → sonido bajo
     mainTone.frequency.value = 150;
     modGain.gain.value = 0;
     modulator.frequency.value = 0;
   } else {
     if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
-      // derecha → pitido intermitente
       mainTone.frequency.value = 400;
       modulator.frequency.value = 2;
       modGain.gain.value = 0.02;
     } else {
-      // izquierda → pitido constante
       mainTone.frequency.value = 400;
       modulator.frequency.value = 0;
       modGain.gain.value = 0;
@@ -147,7 +145,7 @@ function drawCardinals() {
   });
 }
 
-// --- FUNCIÓN PARA HABLAR CARDINAL + GRADOS ---
+// --- HABLAR CARDINAL + GRADOS ---
 function speakCurrentDirection(angle) {
   let closest = CARDINALS[0];
   let minDiff = 360;
@@ -170,17 +168,12 @@ function handleOrientation(event) {
   angle = (angle + 180) % 360;
   angle = Math.round(angle);
 
-  // --- ROTAR EL CONTENEDOR DE CARDINALES ---
   const container = document.getElementById("cardinalsContainer");
   container.style.transform = `rotate(${-angle}deg)`;
 
-  // --- ROTAR AGUJA ---
   const needle = document.getElementById("needle");
-  //needle.style.transform = `rotate(${angle}deg)`;
-  //needle.style.transform = `rotate(${angle + 180}deg)`;
+  needle.style.transform = `rotate(${angle}deg)`;
 
-
-  // --- AUDIO ---
   if (lastAngle !== null) {
     const diff = Math.abs(angle - lastAngle);
     updateAudio(angle, diff);
@@ -188,7 +181,6 @@ function handleOrientation(event) {
 
   lastAngle = angle;
 
-  // --- INICIAR INTERVALO DE VOZ SI NO EXISTE ---
   if (!speakInterval) {
     speakInterval = setInterval(() => {
       speakCurrentDirection(lastAngle);
@@ -196,12 +188,34 @@ function handleOrientation(event) {
   }
 }
 
+// --- WAKE LOCK ---
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock activado');
+      wakeLock.addEventListener('release', () => {
+        console.log('Wake Lock liberado');
+      });
+    }
+  } catch (err) {
+    console.error(`${err.name}, ${err.message}`);
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (wakeLock !== null && document.visibilityState === 'visible') {
+    requestWakeLock();
+  }
+});
+
 // --- INICIO ---
 document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("startBtn").style.display="none";
   document.getElementById("compass").style.display="block";
   drawCardinals();
   startAudio();
+  requestWakeLock(); // evita que la pantalla se apague
 
   if (typeof DeviceOrientationEvent.requestPermission === "function") {
     const permission = await DeviceOrientationEvent.requestPermission();
