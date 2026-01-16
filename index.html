@@ -227,7 +227,18 @@ function drawCardinals() {
   }
 }
 
-// --- HABLAR CARDINAL + GRADOS ---
+// Mapeo abreviatura → nombre completo
+const fullCardinalNames = {
+  N: "Norte",
+  NE: "Noreste",
+  E: "Este",
+  SE: "Sureste",
+  S: "Sur",
+  SO: "Suroeste",
+  O: "Oeste",
+  NO: "Noroeste"
+};
+
 function speakCurrentDirection(angle) {
   let closest = CARDINALS[0];
   let minDiff = 360;
@@ -238,7 +249,9 @@ function speakCurrentDirection(angle) {
       closest = c;
     }
   });
-  const textToSpeak = `${closest.name}, ${angle} grados`;
+
+  const fullName = fullCardinalNames[closest.name] || closest.name;
+  const textToSpeak = `${fullName}, ${angle} grados`;
   document.getElementById("directionText").textContent = textToSpeak;
   speak(textToSpeak);
 }
