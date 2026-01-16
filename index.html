@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Brújula Accesible</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<button id="startBtn" style="font-size:2em; padding:1em;">
+  Tocar para comenzar
+</button>
+
+<script>
+let lastAngle = null;
+let currentDirection = null;
+let speakInterval = null;
+let audioCtx = null;
+let tone = null;
+
+// --- CONFIGURACIÓN ---
+const STABLE_THRESHOLD = 2; // grados para considerar que no se mueve
+
+const DIRECTIONS = [
+  { name: "Norte", min: 315, max: 360, interval: 7000 },
+  { name: "Norte", min: 0,   max: 45,  interval: 7000 },
+  { name: "Este",  min: 45,  max: 135, interval: 6000 },
+  { name: "Sur",   min: 135, max: 225, interval: 8000 },
+  { name: "Oeste", min: 225, max: 315, interval: 5000 }
+];
+
+// --- VOZ ---
+function speak(text) {
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "es-ES";
+  utter.rate = 1;
+  window.speechSynthesis.speak(utter);
+}
+
+// --- SONIDO CONTINUO SUAVE ---
+function startTone() {
+  if (tone) return;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  tone = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  tone.frequency.value = 220;      // tono grave
+  gain.gain.value = 0.02;           // volumen muy bajo
+
+  tone.connect(gain);
+  gain.connect(audioCtx.destination);
+  tone.start();
+}
+
+function stopTone() {
+  if (!tone) return;
+  tone.stop();
+  tone.disconnect();
+  tone = null;
+  audioCtx.close();
+  audioCtx = null;
+}
+
+// --- VIBRACIÓN ---
+function vibrateLeft() {
+  navigator.vibrate([300]);
+}
+
+function vibrateRight() {
+  navigator.vibrate([100]);
+}
+
+// --- DIRECCIÓN ---
+function getDirection(angle) {
+  return DIRECTIONS.find(d => angle >= d.min && angle < d.max);
+}
+
+function startSpeaking(direction) {
+  if (speakInterval) clearInterval(speakInterval);
+
+  speak(direction.name);
+  speakInterval = setInterval(() => {
+    speak(direction.name);
+  }, direction.interval);
+}
+
+// --- ORIENTACIÓN ---
+function handleOrientation(event) {
+  let angle = event.alpha;
+  if (angle === null) return;
+
+  angle = Math.round(angle);
+
+  if (lastAngle !== null) {
+    const diff = Math.abs(angle - lastAngle);
+
+    if (diff <= STABLE_THRESHOLD) {
+      startTone();
+    } else {
+      stopTone();
+
+      if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
+        vibrateRight();
+      } else {
+        vibrateLeft();
+      }
+    }
+  }
+
+  const dir = getDirection(angle);
+  if (dir && (!currentDirection || dir.name !== currentDirection.name)) {
+    currentDirection = dir;
+    startSpeaking(dir);
+  }
+
+  lastAngle = angle;
+}
+
+// --- INICIO ---
+document.getElementById("startBtn").addEventListener("click", async () => {
+  document.getElementById("startBtn").style.display = "none";
+
+  // Permiso en iOS
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    const permission = await DeviceOrientationEvent.requestPermission();
+    if (permission !== "granted") {
+      speak("Permiso denegado");
+      return;
+    }
+  }
+
+  speak("Brújula iniciada");
+  window.addEventListener("deviceorientation", handleOrientation);
+});
+</script>
+
+</body>
+</html>
