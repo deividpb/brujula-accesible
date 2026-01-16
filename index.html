@@ -5,44 +5,12 @@
 <title>Brújula Accesible</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    background: #f0f0f0;
-  }
-  #startBtn {
-    font-size: 2em;
-    padding: 1em;
-    margin-top: 2em;
-  }
-  #compass {
-    margin: 2em auto;
-    width: 300px;
-    height: 300px;
-    position: relative;
-    border: 5px solid #333;
-    border-radius: 50%;
-    background: radial-gradient(circle at center, #fff 70%, #ddd 100%);
-  }
-  #needle {
-    width: 4px;
-    height: 140px;
-    background: red;
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform-origin: bottom center;
-    transform: rotate(0deg);
-  }
-  .cardinal {
-    position: absolute;
-    font-weight: bold;
-    font-size: 1.5em;
-  }
-  #directionText {
-    font-size: 2em;
-    margin-top: 1em;
-  }
+  body { font-family: sans-serif; text-align:center; background:#f0f0f0; }
+  #startBtn { font-size:2em; padding:1em; margin-top:2em; }
+  #compass { margin:2em auto; width:300px; height:300px; position:relative; border:5px solid #333; border-radius:50%; background:radial-gradient(circle at center,#fff 70%,#ddd 100%); }
+  #needle { width:4px; height:140px; background:red; position:absolute; top:10px; left:50%; transform-origin:bottom center; transform:rotate(0deg); }
+  .cardinal { position:absolute; font-weight:bold; font-size:1.5em; }
+  #directionText { font-size:2em; margin-top:1em; }
 </style>
 </head>
 <body>
@@ -51,7 +19,6 @@
 
 <div id="compass" style="display:none;">
   <div id="needle"></div>
-  <!-- Puntos cardinales -->
   <div class="cardinal" style="top:5px; left:50%; transform:translateX(-50%);">N</div>
   <div class="cardinal" style="top:50%; right:5px; transform:translateY(-50%);">E</div>
   <div class="cardinal" style="bottom:5px; left:50%; transform:translateX(-50%);">S</div>
@@ -62,17 +29,23 @@
 <script>
 let lastAngle = null;
 let currentDirection = null;
+let speakInterval = null;
+
+// --- AUDIO ---
 let audioCtx = null;
-let tone = null;
+let mainTone = null;
+let modulator = null; // para pitido intermitente
+let modGain = null;
 
 // --- CONFIGURACIÓN ---
 const STABLE_THRESHOLD = 2; // grados para considerar estable
+const CARDINAL_REPEAT_INTERVAL = 4000; // ms para repetir voz cardinal
 const DIRECTIONS = [
-  { name: "Norte", min: 315, max: 360, interval: 7000 },
-  { name: "Norte", min: 0,   max: 45,  interval: 7000 },
-  { name: "Este",  min: 45,  max: 135, interval: 6000 },
-  { name: "Sur",   min: 135, max: 225, interval: 8000 },
-  { name: "Oeste", min: 225, max: 315, interval: 5000 }
+  { name: "Norte", min: 315, max: 360 },
+  { name: "Norte", min: 0,   max: 45 },
+  { name: "Este",  min: 45,  max: 135 },
+  { name: "Sur",   min: 135, max: 225 },
+  { name: "Oeste", min: 225, max: 315 }
 ];
 
 // --- VOZ ---
@@ -84,41 +57,60 @@ function speak(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// --- TONO CONTINUO ---
-function startTone() {
-  if (tone) return;
+// --- AUDIO ---
+function startAudio() {
+  if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  tone = audioCtx.createOscillator();
+
+  mainTone = audioCtx.createOscillator();
+  mainTone.type = "sine";
+  mainTone.frequency.value = 200; // tono base bajo
   const gain = audioCtx.createGain();
-  tone.frequency.value = 220;
-  gain.gain.value = 0.02;
-  tone.connect(gain);
+  gain.gain.value = 0.02; // volumen bajo
+
+  mainTone.connect(gain);
   gain.connect(audioCtx.destination);
-  tone.start();
+  mainTone.start();
+
+  modulator = audioCtx.createOscillator();
+  modulator.type = "sine";
+  modulator.frequency.value = 0; // inicialmente apagado
+  modGain = audioCtx.createGain();
+  modGain.gain.value = 0;
+
+  modulator.connect(modGain);
+  modGain.connect(audioCtx.destination);
+  modulator.start();
 }
 
-function stopTone() {
-  if (!tone) return;
-  tone.stop();
-  tone.disconnect();
-  tone = null;
+function stopAudio() {
+  if (!audioCtx) return;
+  mainTone.stop();
+  modulator.stop();
   audioCtx.close();
   audioCtx = null;
 }
 
-function updateTone(angle) {
-  if (!tone) return;
-  let diffToNorth = Math.min(Math.abs(angle - 0), Math.abs(angle - 360));
-  tone.frequency.value = 220 + (100 - diffToNorth);
-}
+// --- SONIDO SEGÚN MOVIMIENTO ---
+function updateAudio(angle, diff) {
+  if (!mainTone) return;
 
-// --- VIBRACIÓN ---
-function vibrateLeft() {
-  navigator.vibrate([100, 50, 100]);
-}
-
-function vibrateRight() {
-  navigator.vibrate([300]);
+  if (diff <= STABLE_THRESHOLD) {
+    // estable → sonido suave constante
+    mainTone.frequency.value = 200;
+    modGain.gain.value = 0;
+  } else {
+    if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
+      // gira derecha → pitido continuo más alto
+      mainTone.frequency.value = 400;
+      modGain.gain.value = 0; // sin modulador
+    } else {
+      // gira izquierda → pitido intermitente
+      mainTone.frequency.value = 400;
+      modulator.frequency.value = 2; // 2 Hz intermitente
+      modGain.gain.value = 0.02;
+    }
+  }
 }
 
 // --- DIRECCIÓN ---
@@ -126,9 +118,17 @@ function getDirection(angle) {
   return DIRECTIONS.find(d => angle >= d.min && angle < d.max);
 }
 
-function updateDirectionUI(direction) {
-  const dirText = document.getElementById("directionText");
-  dirText.textContent = direction.name;
+function startCardinalSpeech(direction) {
+  if (speakInterval) clearInterval(speakInterval);
+  speak(direction.name);
+  speakInterval = setInterval(() => {
+    speak(direction.name);
+  }, CARDINAL_REPEAT_INTERVAL);
+}
+
+function stopCardinalSpeech() {
+  if (speakInterval) clearInterval(speakInterval);
+  speakInterval = null;
 }
 
 // --- ORIENTACIÓN ---
@@ -136,7 +136,7 @@ function handleOrientation(event) {
   let angle = event.alpha;
   if (angle === null) return;
 
-  // CORRECCIÓN DE 180° para que 0° = Norte
+  // corrección 180°
   angle = (angle + 180) % 360;
   angle = Math.round(angle);
 
@@ -144,27 +144,18 @@ function handleOrientation(event) {
   const needle = document.getElementById("needle");
   needle.style.transform = `rotate(${angle}deg)`;
 
+  // --- MOVIMIENTO Y AUDIO ---
   if (lastAngle !== null) {
-    const diff = Math.abs(angle - lastAngle);
-    if (diff <= STABLE_THRESHOLD) {
-      startTone();
-      updateTone(angle);
-    } else {
-      stopTone();
-      if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
-        vibrateRight();
-      } else {
-        vibrateLeft();
-      }
-    }
+    let diff = Math.abs(angle - lastAngle);
+    updateAudio(angle, diff);
   }
 
   // --- DIRECCIÓN CARDINAL ---
   const dir = getDirection(angle);
   if (dir && (!currentDirection || dir.name !== currentDirection.name)) {
     currentDirection = dir;
-    speak(dir.name);
-    updateDirectionUI(dir);
+    startCardinalSpeech(dir);
+    document.getElementById("directionText").textContent = dir.name;
   }
 
   lastAngle = angle;
@@ -175,7 +166,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("startBtn").style.display = "none";
   document.getElementById("compass").style.display = "block";
 
-  // Permiso en iOS
+  // permiso iOS
   if (typeof DeviceOrientationEvent.requestPermission === "function") {
     const permission = await DeviceOrientationEvent.requestPermission();
     if (permission !== "granted") {
@@ -185,6 +176,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   }
 
   speak("Brújula iniciada");
+  startAudio();
   window.addEventListener("deviceorientation", handleOrientation);
 });
 </script>
