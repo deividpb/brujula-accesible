@@ -7,9 +7,37 @@
 <style>
   body { font-family:sans-serif; text-align:center; background:#f0f0f0; }
   #startBtn { font-size:2em; padding:1em; margin-top:2em; }
-  #compass { margin:2em auto; width:300px; height:300px; position:relative; border:5px solid #333; border-radius:50%; background:radial-gradient(circle at center,#fff 70%,#ddd 100%); }
-  #needle { width:4px; height:140px; background:red; position:absolute; top:10px; left:50%; transform-origin:bottom center; transform:rotate(0deg); }
-  .cardinal { position:absolute; font-weight:bold; font-size:1.2em; transform:translate(-50%,-50%); }
+  #compass { 
+    margin:2em auto; 
+    width:300px; 
+    height:300px; 
+    position:relative; 
+    border:5px solid #333; 
+    border-radius:50%; 
+    background:radial-gradient(circle at center,#fff 70%,#ddd 100%);
+    overflow: hidden;
+  }
+  #needle { 
+    width:4px; 
+    height:140px; 
+    background:red; 
+    position:absolute; 
+    top:10px; 
+    left:50%; 
+    transform-origin:bottom center; 
+  }
+  #cardinalsContainer {
+    position:absolute;
+    width:100%;
+    height:100%;
+    top:0; left:0;
+  }
+  .cardinal { 
+    position:absolute; 
+    font-weight:bold; 
+    font-size:1.2em; 
+    transform:translate(-50%,-50%);
+  }
   #directionText { font-size:2em; margin-top:1em; }
 </style>
 </head>
@@ -18,6 +46,7 @@
 <button id="startBtn">Tocar para comenzar</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
+  <div id="cardinalsContainer"></div>
 </div>
 <div id="directionText"></div>
 
@@ -33,8 +62,8 @@ let modulator = null;
 let modGain = null;
 
 // --- CONFIGURACIÓN ---
-const STABLE_THRESHOLD = 2; // grados para considerar estable
-const CARDINAL_REPEAT_INTERVAL = 4000; // ms repetir voz
+const STABLE_THRESHOLD = 2; 
+const CARDINAL_REPEAT_INTERVAL = 4000; 
 const CARDINALS = [
   { name:"Norte", angle:0 },
   { name:"NE", angle:45 },
@@ -62,7 +91,7 @@ function startAudio() {
 
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
-  mainTone.frequency.value = 200;
+  mainTone.frequency.value = 150; // bajo constante
   const gain = audioCtx.createGain();
   gain.gain.value = 0.02;
   mainTone.connect(gain);
@@ -82,24 +111,29 @@ function startAudio() {
 function updateAudio(angle, diff) {
   if (!mainTone) return;
   if (diff <= STABLE_THRESHOLD) {
-    mainTone.frequency.value = 200;
+    // estable → sonido bajo
+    mainTone.frequency.value = 150;
     modGain.gain.value = 0;
+    modulator.frequency.value = 0;
   } else {
     if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
-      mainTone.frequency.value = 400; // gira derecha
-      modGain.gain.value = 0;
-    } else {
-      mainTone.frequency.value = 400; // gira izquierda intermitente
-      modulator.frequency.value = 2; 
+      // derecha → pitido intermitente
+      mainTone.frequency.value = 400;
+      modulator.frequency.value = 2;
       modGain.gain.value = 0.02;
+    } else {
+      // izquierda → pitido constante
+      mainTone.frequency.value = 400;
+      modulator.frequency.value = 0;
+      modGain.gain.value = 0;
     }
   }
 }
 
-// --- CARDINALES ---
+// --- DIBUJAR CARDINALES ---
 function drawCardinals() {
-  const compass = document.getElementById("compass");
-  const center = 150; // radio
+  const container = document.getElementById("cardinalsContainer");
+  const center = 150;
   const radius = 130;
   CARDINALS.forEach(c => {
     const rad = c.angle * Math.PI/180;
@@ -110,22 +144,20 @@ function drawCardinals() {
     div.style.left = x+"px";
     div.style.top = y+"px";
     div.textContent = c.name;
-    compass.appendChild(div);
+    container.appendChild(div);
   });
 }
 
 // --- ORIENTACIÓN ---
 function handleOrientation(event) {
   let angle = event.alpha;
-  if (angle === null) return;
-  angle = (angle + 180) % 360; // ajuste
+  if (angle===null) return;
+  angle = (angle + 180)%360;
   angle = Math.round(angle);
 
-  // --- AGUJA apunta a donde mira el usuario ---
-  const needle = document.getElementById("needle");
-  //needle.style.transform = `rotate(${angle}deg)`;
-  needle.style.transform = `rotate(${angle + 180}deg)`;
-
+  // --- ROTAR EL CONTENEDOR DE CARDINALES ---
+  const container = document.getElementById("cardinalsContainer");
+  container.style.transform = `rotate(${-angle}deg)`; // negativo para que gire en sentido correcto
 
   // --- AUDIO ---
   if (lastAngle !== null) {
@@ -136,7 +168,7 @@ function handleOrientation(event) {
   // --- PUNTOS CARDINALES ---
   CARDINALS.forEach(c => {
     const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
-    if (diff < 10) { // cerca del cardinal
+    if (diff < 10) { 
       if (!currentCardinal || currentCardinal.name !== c.name) {
         currentCardinal = c;
         speak(c.name);
