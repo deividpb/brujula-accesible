@@ -124,10 +124,12 @@
 <script>
 let lastAngle = null;
 let wakeLock = null;
+let speakInterval = null;
 
 // --- AUDIO CONTINUO ---
 let audioCtx = null;
 let mainTone = null;
+let gainNode = null;
 
 // --- CONFIGURACIÓN ---
 const CARDINALS = [
@@ -140,6 +142,17 @@ const CARDINALS = [
   { name:"O", angle:270 },
   { name:"NO", angle:315 }
 ];
+
+const fullCardinalNames = {
+  N: "Norte",
+  NE: "Noreste",
+  E: "Este",
+  SE: "Sureste",
+  S: "Sur",
+  SO: "Suroeste",
+  O: "Oeste",
+  NO: "Noroeste"
+};
 
 // --- VOZ ---
 function speak(text) {
@@ -154,13 +167,16 @@ function speak(text) {
 function startAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
   mainTone.frequency.value = 150; // inicial grave
-  const gain = audioCtx.createGain();
-  gain.gain.value = 0.05; // volumen suave
-  mainTone.connect(gain);
-  gain.connect(audioCtx.destination);
+
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0.25; // 🔊 sonido más fuerte
+
+  mainTone.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
   mainTone.start();
 }
 
@@ -197,6 +213,21 @@ function drawCardinals() {
   }
 }
 
+// --- FUNCIONES DE VOZ ---
+function speakCurrentDirection(angle) {
+  let closest = CARDINALS[0];
+  let minDiff = 360;
+  CARDINALS.forEach(c => {
+    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = c;
+    }
+  });
+  const textToSpeak = `${fullCardinalNames[closest.name]}, ${angle} grados`;
+  speak(textToSpeak);
+}
+
 // --- ORIENTACIÓN ---
 function handleOrientation(event) {
   let angle = event.alpha;
@@ -217,7 +248,7 @@ function handleOrientation(event) {
 
   lastAngle = angle;
 
-  // Muestra texto
+  // Actualiza texto visual
   let closest = CARDINALS[0];
   let minDiff = 360;
   CARDINALS.forEach(c => {
@@ -227,17 +258,6 @@ function handleOrientation(event) {
       closest = c;
     }
   });
-
-  const fullCardinalNames = {
-    N: "Norte",
-    NE: "Noreste",
-    E: "Este",
-    SE: "Sureste",
-    S: "Sur",
-    SO: "Suroeste",
-    O: "Oeste",
-    NO: "Noroeste"
-  };
   document.getElementById("directionText").textContent = `${fullCardinalNames[closest.name]} (${angle}°)`;
 }
 
@@ -273,8 +293,17 @@ document.getElementById("startBtn").addEventListener("click", async () => {
     const permission = await DeviceOrientationEvent.requestPermission();
     if (permission!=="granted") { speak("Permiso denegado"); return; }
   }
+
   speak("Brújula iniciada");
+
   window.addEventListener("deviceorientation", handleOrientation);
+
+  // 🔊 Intervalo de voz cada 3 segundos
+  if (!speakInterval) {
+    speakInterval = setInterval(() => {
+      if (lastAngle !== null) speakCurrentDirection(lastAngle);
+    }, 3000);
+  }
 });
 </script>
 
