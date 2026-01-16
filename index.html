@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Brújula</title>
+<title>Brújula Sonora</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body { 
@@ -35,14 +35,13 @@
     width: 320px; 
     height: 320px; 
     position: relative; 
-    border: 12px solid #C19A6B; /* Borde metálico dorado */
+    border: 12px solid #C19A6B;
     border-radius: 50%; 
-    background: radial-gradient(circle at center, #F5F5DC 60%, #D2B48C 100%); /* Fondo tipo madera clara */
+    background: radial-gradient(circle at center, #F5F5DC 60%, #D2B48C 100%);
     box-shadow: inset 0 0 15px rgba(0,0,0,0.3), 0 5px 20px rgba(0,0,0,0.5);
     overflow: hidden;
   }
 
-  /* Aguja */
   #needle { 
     width: 6px; 
     height: 140px; 
@@ -61,7 +60,7 @@
     transform: translateX(-50%);
     width: 4px;
     height: 70px;
-    background: red; /* Norte */
+    background: red; 
     border-radius: 2px;
     box-shadow: 0 0 5px rgba(255,0,0,0.8);
   }
@@ -74,7 +73,7 @@
     transform: translateX(-50%);
     width: 4px;
     height: 70px;
-    background: black; /* Sur */
+    background: black;
     border-radius: 2px;
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
   }
@@ -95,7 +94,6 @@
     transform:translate(-50%,-50%);
   }
 
-  /* Marcas de grados */
   .tick {
     position: absolute;
     width: 2px;
@@ -125,18 +123,13 @@
 
 <script>
 let lastAngle = null;
-let speakInterval = null;
 let wakeLock = null;
 
-// --- AUDIO ---
+// --- AUDIO CONTINUO ---
 let audioCtx = null;
 let mainTone = null;
-let modulator = null;
-let modGain = null;
 
 // --- CONFIGURACIÓN ---
-const STABLE_THRESHOLD = 2; 
-const CARDINAL_REPEAT_INTERVAL = 3000; 
 const CARDINALS = [
   { name:"N", angle:0 },
   { name:"NE", angle:45 },
@@ -157,50 +150,28 @@ function speak(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// --- AUDIO ---
+// --- AUDIO CONTINUO ---
 function startAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
   mainTone = audioCtx.createOscillator();
   mainTone.type = "sine";
-  mainTone.frequency.value = 150; 
+  mainTone.frequency.value = 150; // inicial grave
   const gain = audioCtx.createGain();
-  gain.gain.value = 0.02;
+  gain.gain.value = 0.05; // volumen suave
   mainTone.connect(gain);
   gain.connect(audioCtx.destination);
   mainTone.start();
-
-  modulator = audioCtx.createOscillator();
-  modulator.type = "sine";
-  modulator.frequency.value = 0;
-  modGain = audioCtx.createGain();
-  modGain.gain.value = 0;
-  modulator.connect(modGain);
-  modGain.connect(audioCtx.destination);
-  modulator.start();
 }
 
-function updateAudio(angle, diff) {
-  if (!mainTone) return;
-  if (diff <= STABLE_THRESHOLD) {
-    mainTone.frequency.value = 150;
-    modGain.gain.value = 0;
-    modulator.frequency.value = 0;
-  } else {
-    if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
-      mainTone.frequency.value = 400;
-      modulator.frequency.value = 2;
-      modGain.gain.value = 0.02;
-    } else {
-      mainTone.frequency.value = 400;
-      modulator.frequency.value = 0;
-      modGain.gain.value = 0;
-    }
-  }
+// Convierte ángulo (0-360°) a frecuencia (150Hz → 1000Hz)
+function angleToFrequency(angle) {
+  const minFreq = 150;
+  const maxFreq = 1000;
+  return minFreq + (maxFreq - minFreq) * (angle / 360);
 }
 
-// --- DIBUJAR CARDINALES Y MARCAS ---
+// --- DIBUJAR CARDINALES ---
 function drawCardinals() {
   const container = document.getElementById("cardinalsContainer");
   const center = 160;
@@ -218,42 +189,12 @@ function drawCardinals() {
     container.appendChild(div);
   });
 
-  // Marcas de grados cada 10°
   for(let i=0;i<360;i+=10){
     const tick = document.createElement("div");
     tick.className = "tick";
     tick.style.transform = `rotate(${i}deg) translateY(-150px)`;
     container.appendChild(tick);
   }
-}
-
-// Mapeo abreviatura → nombre completo
-const fullCardinalNames = {
-  N: "Norte",
-  NE: "Noreste",
-  E: "Este",
-  SE: "Sureste",
-  S: "Sur",
-  SO: "Suroeste",
-  O: "Oeste",
-  NO: "Noroeste"
-};
-
-function speakCurrentDirection(angle) {
-  let closest = CARDINALS[0];
-  let minDiff = 360;
-  CARDINALS.forEach(c => {
-    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
-    if (diff < minDiff) {
-      minDiff = diff;
-      closest = c;
-    }
-  });
-
-  const fullName = fullCardinalNames[closest.name] || closest.name;
-  const textToSpeak = `${fullName}, ${angle} grados`;
-  document.getElementById("directionText").textContent = textToSpeak;
-  speak(textToSpeak);
 }
 
 // --- ORIENTACIÓN ---
@@ -267,19 +208,37 @@ function handleOrientation(event) {
   container.style.transform = `rotate(${-angle}deg)`;
 
   const needle = document.getElementById("needle");
+  needle.style.transform = `rotate(${angle}deg)`;
 
-  if (lastAngle !== null) {
-    const diff = Math.abs(angle - lastAngle);
-    updateAudio(angle, diff);
+  // Actualiza frecuencia continua según ángulo
+  if (mainTone) {
+    mainTone.frequency.setTargetAtTime(angleToFrequency(angle), audioCtx.currentTime, 0.05);
   }
 
   lastAngle = angle;
 
-  if (!speakInterval) {
-    speakInterval = setInterval(() => {
-      speakCurrentDirection(lastAngle);
-    }, CARDINAL_REPEAT_INTERVAL);
-  }
+  // Muestra texto
+  let closest = CARDINALS[0];
+  let minDiff = 360;
+  CARDINALS.forEach(c => {
+    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = c;
+    }
+  });
+
+  const fullCardinalNames = {
+    N: "Norte",
+    NE: "Noreste",
+    E: "Este",
+    SE: "Sureste",
+    S: "Sur",
+    SO: "Suroeste",
+    O: "Oeste",
+    NO: "Noroeste"
+  };
+  document.getElementById("directionText").textContent = `${fullCardinalNames[closest.name]} (${angle}°)`;
 }
 
 // --- WAKE LOCK ---
