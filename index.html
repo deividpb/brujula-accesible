@@ -43,7 +43,7 @@
 </head>
 <body>
 
-<button id="startBtn">Tocar para comenzar 7</button>
+<button id="startBtn">Tocar para comenzar 8</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
   <div id="cardinalsContainer"></div>
@@ -52,7 +52,6 @@
 
 <script>
 let lastAngle = null;
-let currentCardinal = null;
 let speakInterval = null;
 
 // --- AUDIO ---
@@ -148,11 +147,27 @@ function drawCardinals() {
   });
 }
 
+// --- FUNCIÓN PARA HABLAR CARDINAL + GRADOS ---
+function speakCurrentDirection(angle) {
+  let closest = CARDINALS[0];
+  let minDiff = 360;
+  CARDINALS.forEach(c => {
+    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = c;
+    }
+  });
+  const textToSpeak = `${closest.name}, ${angle} grados`;
+  document.getElementById("directionText").textContent = textToSpeak;
+  speak(textToSpeak);
+}
+
 // --- ORIENTACIÓN ---
 function handleOrientation(event) {
   let angle = event.alpha;
-  if (angle===null) return;
-  angle = (angle + 180)%360;
+  if (angle === null) return;
+  angle = (angle + 180) % 360;
   angle = Math.round(angle);
 
   // --- ROTAR EL CONTENEDOR DE CARDINALES ---
@@ -166,28 +181,17 @@ function handleOrientation(event) {
   // --- AUDIO ---
   if (lastAngle !== null) {
     const diff = Math.abs(angle - lastAngle);
-    updateAudio(angle,diff);
+    updateAudio(angle, diff);
   }
 
-  // --- PUNTOS CARDINALES + GRADOS ---
-  CARDINALS.forEach(c => {
-    const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
-    if (diff < 10) { 
-      if (!currentCardinal || currentCardinal.name !== c.name) {
-        currentCardinal = c;
-
-        const textToSpeak = `${c.name}, ${angle} grados`;
-        speak(textToSpeak);
-
-        if (speakInterval) clearInterval(speakInterval);
-        speakInterval = setInterval(() => speak(textToSpeak), CARDINAL_REPEAT_INTERVAL);
-
-        document.getElementById("directionText").textContent = textToSpeak;
-      }
-    }
-  });
-
   lastAngle = angle;
+
+  // --- INICIAR INTERVALO DE VOZ SI NO EXISTE ---
+  if (!speakInterval) {
+    speakInterval = setInterval(() => {
+      speakCurrentDirection(lastAngle);
+    }, CARDINAL_REPEAT_INTERVAL);
+  }
 }
 
 // --- INICIO ---
