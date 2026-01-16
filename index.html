@@ -1,26 +1,62 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Brújula Accesible</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Brújula Accesible</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    background: #f0f0f0;
+  }
+  #startBtn {
+    font-size: 2em;
+    padding: 1em;
+    margin-top: 2em;
+  }
+  #compass {
+    margin: 2em auto;
+    width: 300px;
+    height: 300px;
+    position: relative;
+    border: 5px solid #333;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, #fff 70%, #ddd 100%);
+  }
+  #needle {
+    width: 4px;
+    height: 140px;
+    background: red;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform-origin: bottom center;
+    transform: rotate(0deg);
+  }
+  #directionText {
+    font-size: 2em;
+    margin-top: 1em;
+  }
+</style>
 </head>
 <body>
 
-<button id="startBtn" style="font-size:2em; padding:1em;">
-  Tocar para comenzar
-</button>
+<button id="startBtn">Tocar para comenzar</button>
+
+<div id="compass" style="display:none;">
+  <div id="needle"></div>
+</div>
+<div id="directionText"></div>
 
 <script>
 let lastAngle = null;
 let currentDirection = null;
-let speakInterval = null;
 let audioCtx = null;
 let tone = null;
 
 // --- CONFIGURACIÓN ---
-const STABLE_THRESHOLD = 2; // grados para considerar que no se mueve
-
+const STABLE_THRESHOLD = 2; // grados para considerar estable
 const DIRECTIONS = [
   { name: "Norte", min: 315, max: 360, interval: 7000 },
   { name: "Norte", min: 0,   max: 45,  interval: 7000 },
@@ -38,17 +74,14 @@ function speak(text) {
   window.speechSynthesis.speak(utter);
 }
 
-// --- SONIDO CONTINUO SUAVE ---
+// --- TONO CONTINUO ---
 function startTone() {
   if (tone) return;
-
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   tone = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-
-  tone.frequency.value = 220;      // tono grave
-  gain.gain.value = 0.02;           // volumen muy bajo
-
+  tone.frequency.value = 220;
+  gain.gain.value = 0.02;
   tone.connect(gain);
   gain.connect(audioCtx.destination);
   tone.start();
@@ -63,13 +96,19 @@ function stopTone() {
   audioCtx = null;
 }
 
+function updateTone(angle) {
+  if (!tone) return;
+  let diffToNorth = Math.min(Math.abs(angle - 0), Math.abs(angle - 360));
+  tone.frequency.value = 220 + (100 - diffToNorth); // más cerca del norte = más agudo
+}
+
 // --- VIBRACIÓN ---
 function vibrateLeft() {
-  navigator.vibrate([300]);
+  navigator.vibrate([100, 50, 100]);
 }
 
 function vibrateRight() {
-  navigator.vibrate([100]);
+  navigator.vibrate([300]);
 }
 
 // --- DIRECCIÓN ---
@@ -77,30 +116,28 @@ function getDirection(angle) {
   return DIRECTIONS.find(d => angle >= d.min && angle < d.max);
 }
 
-function startSpeaking(direction) {
-  if (speakInterval) clearInterval(speakInterval);
-
-  speak(direction.name);
-  speakInterval = setInterval(() => {
-    speak(direction.name);
-  }, direction.interval);
+function updateDirectionUI(direction) {
+  const dirText = document.getElementById("directionText");
+  dirText.textContent = direction.name;
 }
 
 // --- ORIENTACIÓN ---
 function handleOrientation(event) {
   let angle = event.alpha;
   if (angle === null) return;
-
   angle = Math.round(angle);
+
+  // --- AGUJA ---
+  const needle = document.getElementById("needle");
+  needle.style.transform = `rotate(${angle}deg)`;
 
   if (lastAngle !== null) {
     const diff = Math.abs(angle - lastAngle);
-
     if (diff <= STABLE_THRESHOLD) {
       startTone();
+      updateTone(angle);
     } else {
       stopTone();
-
       if ((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)) {
         vibrateRight();
       } else {
@@ -109,10 +146,12 @@ function handleOrientation(event) {
     }
   }
 
+  // --- DIRECCIÓN CARDINAL ---
   const dir = getDirection(angle);
   if (dir && (!currentDirection || dir.name !== currentDirection.name)) {
     currentDirection = dir;
-    startSpeaking(dir);
+    speak(dir.name);
+    updateDirectionUI(dir);
   }
 
   lastAngle = angle;
@@ -121,6 +160,7 @@ function handleOrientation(event) {
 // --- INICIO ---
 document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("startBtn").style.display = "none";
+  document.getElementById("compass").style.display = "block";
 
   // Permiso en iOS
   if (typeof DeviceOrientationEvent.requestPermission === "function") {
