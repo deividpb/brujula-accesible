@@ -43,7 +43,7 @@
 </head>
 <body>
 
-<button id="startBtn">Tocar para comenzar 6</button>
+<button id="startBtn">Tocar para comenzar 7</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
   <div id="cardinalsContainer"></div>
@@ -63,7 +63,7 @@ let modGain = null;
 
 // --- CONFIGURACIÓN ---
 const STABLE_THRESHOLD = 2; 
-const CARDINAL_REPEAT_INTERVAL = 4000; 
+const CARDINAL_REPEAT_INTERVAL = 3000; 
 const CARDINALS = [
   { name:"Norte", angle:0 },
   { name:"NE", angle:45 },
@@ -157,7 +157,11 @@ function handleOrientation(event) {
 
   // --- ROTAR EL CONTENEDOR DE CARDINALES ---
   const container = document.getElementById("cardinalsContainer");
-  container.style.transform = `rotate(${-angle}deg)`; // negativo para que gire en sentido correcto
+  container.style.transform = `rotate(${-angle}deg)`;
+
+  // --- ROTAR AGUJA ---
+  const needle = document.getElementById("needle");
+  needle.style.transform = `rotate(${angle}deg)`;
 
   // --- AUDIO ---
   if (lastAngle !== null) {
@@ -165,16 +169,20 @@ function handleOrientation(event) {
     updateAudio(angle,diff);
   }
 
-  // --- PUNTOS CARDINALES ---
+  // --- PUNTOS CARDINALES + GRADOS ---
   CARDINALS.forEach(c => {
     const diff = Math.min(Math.abs(angle - c.angle), 360 - Math.abs(angle - c.angle));
     if (diff < 10) { 
       if (!currentCardinal || currentCardinal.name !== c.name) {
         currentCardinal = c;
-        speak(c.name);
+
+        const textToSpeak = `${c.name}, ${angle} grados`;
+        speak(textToSpeak);
+
         if (speakInterval) clearInterval(speakInterval);
-        speakInterval = setInterval(()=> speak(c.name), CARDINAL_REPEAT_INTERVAL);
-        document.getElementById("directionText").textContent = c.name;
+        speakInterval = setInterval(() => speak(textToSpeak), CARDINAL_REPEAT_INTERVAL);
+
+        document.getElementById("directionText").textContent = textToSpeak;
       }
     }
   });
