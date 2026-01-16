@@ -43,7 +43,7 @@
 </head>
 <body>
 
-<button id="startBtn">Tocar para comenzar</button>
+<button id="startBtn">Tocar para comenzar 7</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
   <div id="cardinalsContainer"></div>
@@ -57,9 +57,12 @@ let speakInterval = null;
 
 // --- AUDIO ---
 let audioCtx = null;
-let mainTone = null;      // sonido bajo de referencia
-let directionTone = null; // sonido "PIIII" o "POOO"
-let dirGain = null;
+let stableTone = null;  // sonido bajo constante
+let leftTone = null;    // PIIIII
+let rightTone = null;   // POOOO
+let stableGain = null;
+let leftGain = null;
+let rightGain = null;
 
 // --- CONFIGURACIÓN ---
 const STABLE_THRESHOLD = 2; 
@@ -89,45 +92,55 @@ function startAudio() {
   if(audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-  // Sonido bajo de referencia
-  mainTone = audioCtx.createOscillator();
-  mainTone.type = "sine";
-  mainTone.frequency.value = 150;
-  const mainGain = audioCtx.createGain();
-  mainGain.gain.value = 0.02;
-  mainTone.connect(mainGain);
-  mainGain.connect(audioCtx.destination);
-  mainTone.start();
+  // --- Sonido estable ---
+  stableTone = audioCtx.createOscillator();
+  stableTone.type = "sine";
+  stableTone.frequency.value = 150; // bajo
+  stableGain = audioCtx.createGain();
+  stableGain.gain.value = 0.02;
+  stableTone.connect(stableGain);
+  stableGain.connect(audioCtx.destination);
+  stableTone.start();
 
-  // Sonido direccional
-  directionTone = audioCtx.createOscillator();
-  directionTone.type = "sine";
-  directionTone.frequency.value = 0;
-  dirGain = audioCtx.createGain();
-  dirGain.gain.value = 0;
-  directionTone.connect(dirGain);
-  dirGain.connect(audioCtx.destination);
-  directionTone.start();
+  // --- Sonido izquierda PIIIII ---
+  leftTone = audioCtx.createOscillator();
+  leftTone.type = "sine";
+  leftTone.frequency.value = 800; // alto
+  leftGain = audioCtx.createGain();
+  leftGain.gain.value = 0;
+  leftTone.connect(leftGain);
+  leftGain.connect(audioCtx.destination);
+  leftTone.start();
+
+  // --- Sonido derecha POOOO ---
+  rightTone = audioCtx.createOscillator();
+  rightTone.type = "sine";
+  rightTone.frequency.value = 250; // grave
+  rightGain = audioCtx.createGain();
+  rightGain.gain.value = 0;
+  rightTone.connect(rightGain);
+  rightGain.connect(audioCtx.destination);
+  rightTone.start();
 }
 
-// --- AUDIO SEGÚN MOVIMIENTO ---
-function updateAudio(angle, diff) {
-  if(!mainTone) return;
+function updateAudio(angle, diff){
+  if(!stableTone) return;
 
   if(diff <= STABLE_THRESHOLD){
-    // estable → sonido bajo
-    mainTone.frequency.value = 150;
-    dirGain.gain.value = 0;
-    directionTone.frequency.value = 0;
-  }else{
+    // estable → bajo
+    stableGain.gain.value = 0.02;
+    leftGain.gain.value = 0;
+    rightGain.gain.value = 0;
+  } else {
+    stableGain.gain.value = 0; // apagamos sonido bajo
     if((angle > lastAngle && diff < 180) || (angle < lastAngle && diff > 180)){
-      // derecha → "POOO" continuo grave
-      directionTone.frequency.value = 250; // grave
-      dirGain.gain.value = 0.05;          // audible
-    }else{
-      // izquierda → "PIIII" continuo agudo
-      directionTone.frequency.value = 800; // agudo
-      dirGain.gain.value = 0.05;
+      // derecha → POOOO
+      rightGain.gain.value = 0.05;
+      leftGain.gain.value = 0;
+    } else {
+      // izquierda → PIIIII
+      leftGain.gain.value = 0.05;
+      rightGain.gain.value = 0;
     }
   }
 }
