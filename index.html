@@ -160,7 +160,7 @@ function speak(text) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "es-ES";
   utter.rate = 1;
-  utter.volume = 0.5; // 🔊 volumen más bajo para la voz
+  utter.volume = 0.7; // 🔊 volumen más bajo para la voz
   window.speechSynthesis.speak(utter);
 }
 
