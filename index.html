@@ -176,7 +176,9 @@ function handleOrientation(event) {
 
   // --- ROTAR AGUJA ---
   const needle = document.getElementById("needle");
-  needle.style.transform = `rotate(${angle}deg)`;
+  //needle.style.transform = `rotate(${angle}deg)`;
+  needle.style.transform = `rotate(${angle + 180}deg)`;
+
 
   // --- AUDIO ---
   if (lastAngle !== null) {
