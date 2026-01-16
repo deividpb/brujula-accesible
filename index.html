@@ -160,6 +160,8 @@ function speak(text) {
   const utter = new SpeechSynthesisUtterance(text);
   utter.lang = "es-ES";
   utter.rate = 1;
+  utter.volume = 0.2; // 🔊 volumen más bajo para la voz
+
   window.speechSynthesis.speak(utter);
 }
 
@@ -173,7 +175,7 @@ function startAudio() {
   mainTone.frequency.value = 150; // inicial grave
 
   gainNode = audioCtx.createGain();
-  gainNode.gain.value = 0.25; // 🔊 sonido más fuerte
+  gainNode.gain.value = 0.4; // 🔊 sonido más fuerte
 
   mainTone.connect(gainNode);
   gainNode.connect(audioCtx.destination);
