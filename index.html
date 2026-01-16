@@ -5,48 +5,100 @@
 <title>Brújula Accesible</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body { font-family:sans-serif; text-align:center; background:#f0f0f0; }
-  #startBtn { font-size:2em; padding:1em; margin-top:2em; }
+  body { 
+    font-family: 'Segoe UI', sans-serif; 
+    text-align: center; 
+    background: #1e1e1e; 
+    color: #fff;
+  }
+
+  #startBtn { 
+    font-size: 2em; 
+    padding: 1em 2em; 
+    margin-top: 2em; 
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #ff7f50, #ff4500);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+  }
+
+  #startBtn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  }
+
   #compass { 
-    margin:2em auto; 
-    width:300px; 
-    height:300px; 
-    position:relative; 
-    border:5px solid #333; 
-    border-radius:50%; 
-    background:radial-gradient(circle at center,#fff 70%,#ddd 100%);
+    margin: 2em auto; 
+    width: 320px; 
+    height: 320px; 
+    position: relative; 
+    border: 8px solid #ccc; 
+    border-radius: 50%; 
+    background: radial-gradient(circle at center, #ffffff 60%, #cccccc 100%);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 10px 20px rgba(0,0,0,0.3);
     overflow: hidden;
+    transition: transform 0.5s ease;
   }
+
   #needle { 
-    width:4px; 
-    height:140px; 
-    background:red; 
-    position:absolute; 
-    top:10px; 
-    left:50%; 
-    transform-origin:bottom center; 
+    width: 6px; 
+    height: 150px; 
+    background: red; 
+    position: absolute; 
+    top: 10px; 
+    left: 50%; 
+    transform-origin: bottom center; 
+    border-radius: 3px;
+    box-shadow: 0 0 10px rgba(255,0,0,0.8);
+    transition: transform 0.2s ease;
   }
+
+  #needle::after {
+    content:"";
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: #333;
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+  }
+
   #cardinalsContainer {
     position:absolute;
     width:100%;
     height:100%;
     top:0; left:0;
   }
+
   .cardinal { 
     position:absolute; 
     font-weight:bold; 
-    font-size:1.2em; 
+    font-size:1.4em; 
+    color: #222;
+    text-shadow: 1px 1px 3px rgba(255,255,255,0.8);
     transform:translate(-50%,-50%);
   }
-  #directionText { font-size:2em; margin-top:1em; }
+
+  #directionText { 
+    font-size: 2em; 
+    margin-top: 1em; 
+    color: #ffcc00;
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+  }
 </style>
 </head>
 <body>
 
-<button id="startBtn">Tocar para comenzar 9</button>
+<button id="startBtn">Tocar para comenzar</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
-  <div id="cardinalsContainer"></div>
+  <div id="cardinalsContainer" style="font-size:11px;"></div>
 </div>
 <div id="directionText"></div>
 
@@ -130,8 +182,8 @@ function updateAudio(angle, diff) {
 // --- DIBUJAR CARDINALES ---
 function drawCardinals() {
   const container = document.getElementById("cardinalsContainer");
-  const center = 150;
-  const radius = 130;
+  const center = 160;
+  const radius = 140;
   CARDINALS.forEach(c => {
     const rad = c.angle * Math.PI/180;
     const x = center + radius*Math.sin(rad);
@@ -172,7 +224,6 @@ function handleOrientation(event) {
   container.style.transform = `rotate(${-angle}deg)`;
 
   const needle = document.getElementById("needle");
-  //needle.style.transform = `rotate(${angle}deg)`;
 
   if (lastAngle !== null) {
     const diff = Math.abs(angle - lastAngle);
