@@ -123,7 +123,6 @@
 
 <script>
 let lastAngle = null;
-let initialOffset = null;
 let wakeLock = null;
 let speakInterval = null;
 
@@ -235,16 +234,10 @@ function handleOrientation(event) {
   let angle = event.alpha;
   if (angle === null) return;
 
-  // Ajuste inicial para que la brújula apunte al Norte
-  if (initialOffset === null) {
-    initialOffset = (360 - angle) % 360;
-  }
-
-  angle = (angle + initialOffset) % 360;
-  angle = Math.round(angle);
+  angle = Math.round(angle); // usamos el ángulo real, sin sumar 180
 
   const container = document.getElementById("cardinalsContainer");
-  container.style.transform = `rotate(${-angle}deg)`;
+  container.style.transform = `rotate(${-angle}deg)`; // giramos el círculo, aguja apunta al Norte
 
   if (mainTone) {
     mainTone.frequency.setTargetAtTime(angleToFrequency(angle), audioCtx.currentTime, 0.05);
