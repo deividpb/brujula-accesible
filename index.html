@@ -172,7 +172,7 @@ function handleOrientation(event) {
   container.style.transform = `rotate(${-angle}deg)`;
 
   const needle = document.getElementById("needle");
-  needle.style.transform = `rotate(${angle}deg)`;
+  //needle.style.transform = `rotate(${angle}deg)`;
 
   if (lastAngle !== null) {
     const diff = Math.abs(angle - lastAngle);
