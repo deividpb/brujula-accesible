@@ -34,6 +34,11 @@
     transform-origin: bottom center;
     transform: rotate(0deg);
   }
+  .cardinal {
+    position: absolute;
+    font-weight: bold;
+    font-size: 1.5em;
+  }
   #directionText {
     font-size: 2em;
     margin-top: 1em;
@@ -46,6 +51,11 @@
 
 <div id="compass" style="display:none;">
   <div id="needle"></div>
+  <!-- Puntos cardinales -->
+  <div class="cardinal" style="top:5px; left:50%; transform:translateX(-50%);">N</div>
+  <div class="cardinal" style="top:50%; right:5px; transform:translateY(-50%);">E</div>
+  <div class="cardinal" style="bottom:5px; left:50%; transform:translateX(-50%);">S</div>
+  <div class="cardinal" style="top:50%; left:5px; transform:translateY(-50%);">O</div>
 </div>
 <div id="directionText"></div>
 
@@ -99,7 +109,7 @@ function stopTone() {
 function updateTone(angle) {
   if (!tone) return;
   let diffToNorth = Math.min(Math.abs(angle - 0), Math.abs(angle - 360));
-  tone.frequency.value = 220 + (100 - diffToNorth); // más cerca del norte = más agudo
+  tone.frequency.value = 220 + (100 - diffToNorth);
 }
 
 // --- VIBRACIÓN ---
@@ -125,6 +135,9 @@ function updateDirectionUI(direction) {
 function handleOrientation(event) {
   let angle = event.alpha;
   if (angle === null) return;
+
+  // CORRECCIÓN DE 180° para que 0° = Norte
+  angle = (angle + 180) % 360;
   angle = Math.round(angle);
 
   // --- AGUJA ---
