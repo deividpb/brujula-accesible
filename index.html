@@ -2,23 +2,23 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Brújula Accesible</title>
+<title>Brújula Realista</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
   body { 
-    font-family: 'Segoe UI', sans-serif; 
+    font-family: 'Georgia', serif; 
     text-align: center; 
-    background: #1e1e1e; 
+    background: #222; 
     color: #fff;
   }
 
   #startBtn { 
-    font-size: 2em; 
+    font-size: 1.8em; 
     padding: 1em 2em; 
     margin-top: 2em; 
     border: none;
     border-radius: 12px;
-    background: linear-gradient(145deg, #ff7f50, #ff4500);
+    background: linear-gradient(145deg, #8B4513, #D2691E);
     color: white;
     cursor: pointer;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -26,7 +26,7 @@
   }
 
   #startBtn:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0,0,0,0.4);
   }
 
@@ -35,37 +35,47 @@
     width: 320px; 
     height: 320px; 
     position: relative; 
-    border: 8px solid #ccc; 
+    border: 12px solid #C19A6B; /* Borde metálico dorado */
     border-radius: 50%; 
-    background: radial-gradient(circle at center, #ffffff 60%, #cccccc 100%);
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.2), 0 10px 20px rgba(0,0,0,0.3);
+    background: radial-gradient(circle at center, #F5F5DC 60%, #D2B48C 100%); /* Fondo tipo madera clara */
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.3), 0 5px 20px rgba(0,0,0,0.5);
     overflow: hidden;
-    transition: transform 0.5s ease;
   }
 
+  /* Aguja */
   #needle { 
     width: 6px; 
-    height: 150px; 
-    background: red; 
+    height: 140px; 
     position: absolute; 
-    top: 10px; 
+    top: 20px; 
     left: 50%; 
     transform-origin: bottom center; 
-    border-radius: 3px;
-    box-shadow: 0 0 10px rgba(255,0,0,0.8);
     transition: transform 0.2s ease;
+  }
+
+  #needle::before {
+    content:"";
+    position: absolute;
+    top:0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 70px;
+    background: red; /* Norte */
+    border-radius: 2px;
+    box-shadow: 0 0 5px rgba(255,0,0,0.8);
   }
 
   #needle::after {
     content:"";
     position: absolute;
-    bottom: 0;
+    bottom:0;
     left: 50%;
     transform: translateX(-50%);
-    width: 12px;
-    height: 12px;
-    background: #333;
-    border-radius: 50%;
+    width: 4px;
+    height: 70px;
+    background: black; /* Sur */
+    border-radius: 2px;
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
   }
 
@@ -79,17 +89,28 @@
   .cardinal { 
     position:absolute; 
     font-weight:bold; 
-    font-size:1.4em; 
-    color: #222;
-    text-shadow: 1px 1px 3px rgba(255,255,255,0.8);
+    font-size:1.3em; 
+    color: #333;
+    text-shadow: 1px 1px 2px rgba(255,255,255,0.7);
     transform:translate(-50%,-50%);
+  }
+
+  /* Marcas de grados */
+  .tick {
+    position: absolute;
+    width: 2px;
+    height: 10px;
+    background: #333;
+    top: 10px;
+    left: 50%;
+    transform-origin: bottom center;
   }
 
   #directionText { 
     font-size: 2em; 
     margin-top: 1em; 
-    color: #ffcc00;
-    text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+    color: #FFD700;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
   }
 </style>
 </head>
@@ -98,7 +119,7 @@
 <button id="startBtn">Tocar para comenzar</button>
 <div id="compass" style="display:none;">
   <div id="needle"></div>
-  <div id="cardinalsContainer" style="font-size:11px;"></div>
+  <div id="cardinalsContainer"></div>
 </div>
 <div id="directionText"></div>
 
@@ -117,13 +138,13 @@ let modGain = null;
 const STABLE_THRESHOLD = 2; 
 const CARDINAL_REPEAT_INTERVAL = 3000; 
 const CARDINALS = [
-  { name:"Norte", angle:0 },
+  { name:"N", angle:0 },
   { name:"NE", angle:45 },
-  { name:"Este", angle:90 },
+  { name:"E", angle:90 },
   { name:"SE", angle:135 },
-  { name:"Sur", angle:180 },
+  { name:"S", angle:180 },
   { name:"SO", angle:225 },
-  { name:"Oeste", angle:270 },
+  { name:"O", angle:270 },
   { name:"NO", angle:315 }
 ];
 
@@ -179,11 +200,12 @@ function updateAudio(angle, diff) {
   }
 }
 
-// --- DIBUJAR CARDINALES ---
+// --- DIBUJAR CARDINALES Y MARCAS ---
 function drawCardinals() {
   const container = document.getElementById("cardinalsContainer");
   const center = 160;
   const radius = 140;
+
   CARDINALS.forEach(c => {
     const rad = c.angle * Math.PI/180;
     const x = center + radius*Math.sin(rad);
@@ -195,6 +217,14 @@ function drawCardinals() {
     div.textContent = c.name;
     container.appendChild(div);
   });
+
+  // Marcas de grados cada 10°
+  for(let i=0;i<360;i+=10){
+    const tick = document.createElement("div");
+    tick.className = "tick";
+    tick.style.transform = `rotate(${i}deg) translateY(-150px)`;
+    container.appendChild(tick);
+  }
 }
 
 // --- HABLAR CARDINAL + GRADOS ---
@@ -244,7 +274,6 @@ async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
-      console.log('Wake Lock activado');
       wakeLock.addEventListener('release', () => {
         console.log('Wake Lock liberado');
       });
@@ -266,7 +295,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("compass").style.display="block";
   drawCardinals();
   startAudio();
-  requestWakeLock(); // evita que la pantalla se apague
+  requestWakeLock();
 
   if (typeof DeviceOrientationEvent.requestPermission === "function") {
     const permission = await DeviceOrientationEvent.requestPermission();
